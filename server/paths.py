@@ -51,6 +51,29 @@ def safe_join(base: Path, rel: str) -> Path:
     return target
 
 
+@lru_cache(maxsize=8)
+def _root_pattern(root: str) -> re.Pattern[str]:
+    variants = {root, root.replace("\\", "/"), root.replace("/", "\\")}
+    alts = "|".join(re.escape(v.rstrip("\\/")) + r"[\\/]" for v in sorted(variants, key=len, reverse=True))
+    return re.compile(alts, re.IGNORECASE)
+
+
+def strip_root(text: str, root: Path) -> str:
+    """Show paths relative to the project folder in commands and logs: shorter, and it keeps the user's home
+    path (Windows user name) out of anything displayed or screenshotted. Files on disk keep exact paths."""
+    return _root_pattern(str(root)).sub("", text)
+
+
+def strip_root_deep(obj: Any, root: Path) -> Any:
+    if isinstance(obj, str):
+        return strip_root(obj, root)
+    if isinstance(obj, list):
+        return [strip_root_deep(v, root) for v in obj]
+    if isinstance(obj, dict):
+        return {k: strip_root_deep(v, root) for k, v in obj.items()}
+    return obj
+
+
 def iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 

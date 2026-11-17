@@ -128,6 +128,18 @@ def test_origin_must_be_this_server_or_dev_vite(root: Path) -> None:
     assert not dev._allowed("http://evil.example", host)
 
 
+def test_paths_shown_relative_to_project(root: Path) -> None:
+    """Commands and logs never display the project's absolute path (it contains the Windows user name)."""
+    from server.paths import strip_root, strip_root_deep
+    r = str(root)
+    line = f"$ {r}\\.venv\\Scripts\\python.exe -W ignore clipper/render.py && ffprobe {r.replace(chr(92), '/')}/data/x.mp4"
+    out = strip_root(line, root)
+    assert r not in out and r.replace("\\", "/") not in out
+    assert out == "$ .venv\\Scripts\\python.exe -W ignore clipper/render.py && ffprobe data/x.mp4"
+    assert strip_root(line.upper(), root).count(".VENV") == 1               # case-insensitive on Windows
+    assert strip_root_deep({"steps": [{"command": [f"{r}\\a.py", "x"]}]}, root) == {"steps": [{"command": ["a.py", "x"]}]}
+
+
 def test_keys_never_leak(client: TestClient, root: Path, job_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "sk-ant-REVIEW-SENTINEL-123"
     monkeypatch.setenv("ANTHROPIC_API_KEY", secret)

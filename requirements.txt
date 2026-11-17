@@ -1,0 +1,25 @@
+# Python 3.12. Install torch first from the CPU index (see README), then: pip install -r requirements.txt
+# Versions are the ones this project was built and tested with (2026-11).
+torch==2.8.0
+torchaudio==2.8.0
+whisperx==3.8.6
+pyannote.audio==4.0.7
+anthropic==2.9.0
+fastapi==0.163.1
+uvicorn[standard]==0.54.0
+opencv-python-headless==5.0.0.93
+scenedetect==0.7.3
+python_speech_features==0.6
+soundfile==0.14.0
+numpy==2.5.5
+scipy==1.18.1
+truststore==0.10.5
+python-dotenv==1.2.4
+yt-dlp==2026.10.26
+
+# development and the ASR bake-off
+pytest==9.2.0
+httpx==0.28.1
+ruff==0.17.5
+jiwer==4.0.0
+onnx-asr[cpu,hub]==0.12.0

@@ -22,7 +22,14 @@ from typing import IO, Any
 
 from .actions import RunContext, StepError, StepPlan, plan
 from .errors import ApiError
-from .paths import JOB_ID, RUN_ID, now_iso, read_json, write_json_atomic
+from .paths import (
+    JOB_ID,
+    RUN_ID,
+    now_iso,
+    read_json,
+    strip_root_deep,
+    write_json_atomic,
+)
 
 FINISHED = ("done", "failed", "cancelled")
 IS_WINDOWS = os.name == "nt"
@@ -69,11 +76,14 @@ class Run:
         return self.job_dir / "runs" / f"{self.id}.log"
 
     def info(self) -> dict[str, Any]:
-        return {"id": self.id, "job_id": self.job_id, "action": self.action, "params": dict(self.params),
+        """RunInfo for display and persistence. Commands are shown relative to the project folder (root =
+        <root>/data/jobs/<id>); execution always uses the absolute command built at run time."""
+        info = {"id": self.id, "job_id": self.job_id, "action": self.action, "params": dict(self.params),
                 "state": self.state, "created": self.created, "started": self.started, "ended": self.ended,
                 "steps": [s.info() for s in self.steps], "current_step": self.current_step,
                 "log_url": f"/api/runs/{self.id}/log", "stream_url": f"/api/runs/{self.id}/stream",
                 "error": self.error}
+        return strip_root_deep(info, self.job_dir.parents[2])
 
 
 def new_run_id() -> str:
@@ -192,10 +202,10 @@ class Runner:
         with self._lock:
             run = self._runs.get(run_id)
             if run is not None:
-                return run.info()
+                return strip_root_deep(run.info(), self.root)
         path = self._find_file(run_id)
         data = read_json(path) if path else None
-        return data if isinstance(data, dict) else None
+        return strip_root_deep(data, self.root) if isinstance(data, dict) else None
 
     def log_path(self, run_id: str) -> Path | None:
         with self._lock:
@@ -216,7 +226,8 @@ class Runner:
             for run in self._runs.values():
                 if job_id is None or run.job_id == job_id:
                     found[run.id] = run.info()
-        return sorted(found.values(), key=lambda r: (r.get("created") or "", r["id"]), reverse=True)[:limit]
+        newest = sorted(found.values(), key=lambda r: (r.get("created") or "", r["id"]), reverse=True)[:limit]
+        return [strip_root_deep(r, self.root) for r in newest]
 
     def active_for(self, job_id: str) -> dict[str, Any] | None:
         with self._lock:

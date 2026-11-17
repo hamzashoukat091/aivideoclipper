@@ -11,6 +11,14 @@ const ROW_CAP = 14;
 const ROW_HOOK = 8;
 const AXIS = 18;
 const HANDLE_HIT = 7;
+const MONO_CHAR_PX = 6.7; // 11 px Geist Mono advance
+
+/** Shorten a shot label to fit its segment so neighbouring labels never overlap. */
+function fitLabel(text: string, px: number): string {
+  const max = Math.floor(px / MONO_CHAR_PX);
+  if (text.length <= max) return text;
+  return max <= 1 ? "" : `${text.slice(0, max - 1)}…`;
+}
 
 export interface TimelineEdit {
   /** Trim in/out in timeline time. */
@@ -172,7 +180,7 @@ export function ClipTimeline({
                   />
                   {w > 44 ? (
                     <text x={x0 + 6} y={yShot + 15} className="font-mono" style={{ fontSize: 11 }} fill={lab.edited ? "rgb(var(--accent))" : LAYOUT_COLOR[s.layout]} pointerEvents="none">
-                      {lab.text}
+                      {fitLabel(lab.text, w - 12)}
                     </text>
                   ) : null}
                   {hardCutFrames(s).map((f) => (

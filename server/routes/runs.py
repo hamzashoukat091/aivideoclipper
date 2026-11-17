@@ -18,7 +18,7 @@ from ..deps import AppState, State
 from ..errors import ApiError
 from ..estimate import estimate
 from ..jobs import load_candidates
-from ..paths import check_clip_id, check_job_id, check_run_id
+from ..paths import check_clip_id, check_job_id, check_run_id, strip_root
 from ..runner import FINISHED
 from ..sources import normalize_source
 from .jobs import LANGUAGE
@@ -137,7 +137,7 @@ def get_log(st: State, run_id: str, offset: Annotated[int, Query(ge=0)] = 0) -> 
     if not (finished and offset + len(data) >= size):
         data = _complete_utf8(data)
     new_offset = offset + len(data)
-    return {"text": data.decode("utf-8", errors="replace"), "offset": new_offset,
+    return {"text": strip_root(data.decode("utf-8", errors="replace"), st.root), "offset": new_offset,
             "done": finished and new_offset >= size}
 
 
@@ -168,14 +168,14 @@ async def _stream(request: Request, st: AppState, run_id: str) -> AsyncIterator[
         pending += chunk
         *lines, pending = pending.split(b"\n")
         for line in lines:
-            yield _sse("log", _display_line(line))
+            yield _sse("log", strip_root(_display_line(line), st.root))
         state_json = json.dumps(info, ensure_ascii=False)
         if state_json != last_state:
             last_state = state_json
             yield _sse("state", state_json)
         if finished and len(chunk) < LOG_CHUNK:
             if pending:
-                yield _sse("log", _display_line(pending))
+                yield _sse("log", strip_root(_display_line(pending), st.root))
             yield _sse("end", state_json)
             return
         if time.monotonic() - last_beat >= HEARTBEAT_S:
