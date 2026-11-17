@@ -103,8 +103,16 @@ def _sentences(skip_done: bool) -> Resolver:
     def resolve(ctx: RunContext) -> list[str] | None:
         if skip_done and _has(ctx, "sentences.json"):
             return None
+        if _has(ctx, "candidates.json") and _has(ctx, "sentences.json"):
+            # clips refer to sentences by number: re-splitting would point them at the wrong text
+            return _py("sentences.py", "--id", ctx.job_id, "--relabel-only")
         return _py("sentences.py", "--id", ctx.job_id)
     return resolve
+
+
+def _relabel(ctx: RunContext) -> list[str] | None:
+    """After a diarize re-run, copy the new speaker labels into sentences.json (numbering unchanged)."""
+    return _py("sentences.py", "--id", ctx.job_id, "--relabel-only") if _has(ctx, "sentences.json") else None
 
 
 def _select(only_if_missing: bool) -> Resolver:
@@ -172,13 +180,14 @@ def plan(action: str) -> list[StepPlan]:
     single: dict[str, StepPlan] = {
         "ingest": StepPlan("ingest", _ingest(False)),
         "transcribe": StepPlan("transcribe", _transcribe(False)),
-        "diarize": StepPlan("diarize", _diarize(False), ok_codes=(0, 2)),
         "sentences": StepPlan("sentences", _sentences(False)),
         "select": StepPlan("select", _select(only_if_missing=False)),
         "reframe": StepPlan("reframe", _reframe),
         "render": StepPlan("render", _render),
         "proxy": StepPlan("proxy", _proxy, on_success=_proxy_done),
     }
+    if action == "diarize":
+        return [StepPlan("diarize", _diarize(False), ok_codes=(0, 2)), StepPlan("sentences", _relabel)]
     if action not in single:
         raise ValueError(f"unknown action {action!r}")
     return [single[action]]

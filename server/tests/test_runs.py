@@ -49,7 +49,8 @@ def test_simple_run_done_with_log(client: TestClient, root: Path, job_dir: Path)
     step = done["steps"][0]
     assert step["name"] == "sentences" and step["state"] == "done" and step["exit_code"] == 0
     assert step["command"][0] == sys.executable and step["command"][1:4] == ["-W", "ignore", "clipper/sentences.py"]
-    assert step["command"][4:] == ["--id", JOB]
+    # the fixture job already has clips, so sentences keeps its numbering and only relabels speakers
+    assert step["command"][4:] == ["--id", JOB, "--relabel-only"]
     assert step["started"] and step["ended"] and done["started"] and done["ended"]
     log = client.get(f"/api/runs/{info['id']}/log").json()
     assert log["done"] is True and log["offset"] == len(log["text"].encode("utf-8"))
@@ -87,6 +88,13 @@ def test_diarize_exit_2_is_done(client: TestClient, root: Path) -> None:
     assert done["state"] == "done" and done["steps"][0]["exit_code"] == 2
     assert done["steps"][0]["command"][-2:] == ["--speakers", "2"]
     assert "done with warning" in client.get(f"/api/runs/{done['id']}/log").json()["text"]
+
+
+def test_diarize_then_relabels_sentences(client: TestClient) -> None:
+    """Re-running diarize copies the new speaker labels into sentences.json without renumbering it."""
+    done = wait_run(client, start(client, {"action": "diarize"})["id"])
+    assert done["state"] == "done" and [s["name"] for s in done["steps"]] == ["diarize", "sentences"]
+    assert done["steps"][1]["state"] == "done" and done["steps"][1]["command"][-1] == "--relabel-only"
 
 
 def test_prepare_skips_done_stages_unless_forced(client: TestClient, root: Path) -> None:

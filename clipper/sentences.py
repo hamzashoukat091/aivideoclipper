@@ -95,10 +95,15 @@ def snap_cut(sents: list[dict], i0: int, i1: int, db: np.ndarray,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--id", required=True)
+    ap.add_argument("--relabel-only", action="store_true",
+                    help="only update speaker labels from words.json (keeps sentence numbering for existing clips)")
     args = ap.parse_args()
     stage_banner("sentences", args.id)
     d = job_dir(args.id)
     words = read_json(d / "words.json")["words"]
+    if args.relabel_only:
+        relabel(d, words)
+        return
     heat = read_json(d / "heatmap.json") if (d / "heatmap.json").exists() else []
     db = frame_db(d / "audio16k.wav")
     speech = db[db > np.percentile(db, 30)]
@@ -122,6 +127,18 @@ def main() -> None:
     write_json(d / "sentences.json", out)
     print(f"{len(out)} sentences from {len(words)} words "
           f"(median {np.median([o['end'] - o['start'] for o in out]):.1f}s); heatmap={'yes' if heat else 'no'}")
+
+
+def relabel(d, words: list[dict]) -> None:
+    """Set each existing sentence's speaker from words.json without re-splitting. Used after diarization is added
+    to a job that already has clips: candidates.json refers to sentences by index, so the split must not change."""
+    sents = read_json(d / "sentences.json")
+    for s in sents:
+        spk = [w.get("speaker") for w in words[s["w0"]:s["w1"]] if w.get("speaker")]
+        s["speaker"] = max(set(spk), key=spk.count) if spk else None
+    write_json(d / "sentences.json", sents)
+    named = sorted({s["speaker"] for s in sents if s["speaker"]})
+    print(f"relabelled {len(sents)} sentences (split unchanged); speakers: {', '.join(named) or 'none'}")
 
 
 if __name__ == "__main__":
