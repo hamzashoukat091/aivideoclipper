@@ -1,0 +1,11 @@
+.venv/
+data/
+.env
+__pycache__/
+*.pyc
+*.wav
+*.mkv
+*.mp4
+*.webm
+vendor/
+models/

@@ -1,0 +1,7 @@
+node_modules
+dist
+.mock-cache
+*.tsbuildinfo
+
+# generated locally by npm run fixtures (full third-party transcript + local paths): never commit
+src/api/fixtures/
